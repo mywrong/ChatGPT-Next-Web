@@ -13,7 +13,7 @@ RUN yarn install
 
 FROM base AS builder
 
-RUN apk update && apk add --no-cache git
+RUN apk update && apk upgrade && apk add --no-cache git
 
 ENV OPENAI_API_KEY=""
 ENV CODE=""
@@ -27,7 +27,7 @@ RUN yarn build
 FROM base AS runner
 WORKDIR /app
 
-RUN apk add proxychains-ng
+RUN apk add curl && apk add proxychains-ng && apk add bash && apk add bash-doc && apk add bash-completion
 
 ENV PROXY_URL=""
 ENV OPENAI_API_KEY=""
@@ -37,10 +37,14 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/.next/server ./.next/server
+COPY ./clash-for-linux /app/clash-for-linux
+COPY ./start.sh /app/
 
 EXPOSE 3000
 
+# CMD ["bash","start.sh"]
 CMD if [ -n "$PROXY_URL" ]; then \
+        bash start.sh; \
         export HOSTNAME="127.0.0.1"; \
         protocol=$(echo $PROXY_URL | cut -d: -f1); \
         host=$(echo $PROXY_URL | cut -d/ -f3 | cut -d: -f1); \
@@ -58,5 +62,6 @@ CMD if [ -n "$PROXY_URL" ]; then \
         cat /etc/proxychains.conf; \
         proxychains -f $conf node server.js; \
     else \
+        bash start.sh; \
         node server.js; \
     fi
